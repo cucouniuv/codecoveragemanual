@@ -10,7 +10,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, uArquivoIni;
 
 type
   TfrmCodeCoverage = class(TForm)
@@ -29,10 +29,25 @@ type
     procedure btAbrirRelatorioClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure ckUsarUnitsOriginaisClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
-    { Private declarations }
-  public
-    { Public declarations }
+    FArquivoIni: TArquivoIni;
+    FWorkspace: string;
+    FCaminhoExeAppTests: string;
+    FCaminhoMapAppTests: string;
+    FCaminhoCodeCovPaths: string;
+    FCaminhoCodeCovUnits: string;
+
+    procedure PreencherCaminhoWorkspace;
+    procedure ExecutarCodeCoverage;
+    function DefinirWorkspace: boolean;
+    function ValidarListaUnits: boolean;
+    function ValidarExeAppTests: boolean;
+    function ValidarMapAppTests: boolean;
+    function ValidarCodeCovPaths: boolean;
+    function ValidarCodeCovUnits: boolean;
   end;
 
 var
@@ -61,70 +76,8 @@ begin
 end;
 
 procedure TfrmCodeCoverage.btExecutarClick(Sender: TObject);
-var
-  sComando: string;
-  sParametro: string;
-  sWorkspace: string;
-  sArqListaUnit: string;
 begin
-  sWorkspace := Trim(edWorkspace.Text);
-  if sWorkspace = EmptyStr then
-  begin
-    ShowMessage('Por favor, preencha o caminho da workspace.');
-    edWorkspace.SetFocus;
-    Exit;
-  end;
-
-  if (not ckUsarUnitsOriginais.Checked) and (Trim(mmUnits.Text) = EmptyStr) then
-  begin
-    ShowMessage('Por favor, preencha a lista de units.');
-    mmUnits.SetFocus;
-    Exit;
-  end;
-
-  if not (FileExists(sWorkspace + '\bin\pg5AppTests.exe')) then
-  begin
-    ShowMessage('Arquivo inexistente: ' + sWorkspace + '\bin\pg5AppTests.exe');
-    Exit;
-  end;
-
-  if not (FileExists(sWorkspace + '\bin\pg5AppTests.map')) then
-  begin
-    ShowMessage('Arquivo inexistente: ' + sWorkspace + '\bin\pg5AppTests.map');
-    Exit;
-  end;
-
-  if not (FileExists(sWorkspace + '\bin\CodeCoverage\CodeCov_Paths.lst')) then
-  begin
-    ShowMessage('Arquivo inexistente: ' + sWorkspace + '\bin\CodeCoverage\CodeCov_Paths.lst');
-    Exit;
-  end;
-
-  if ckUsarUnitsOriginais.Checked then
-  begin
-    sArqListaUnit := sWorkspace + '\bin\CodeCoverage\CodeCov_units.lst';
-
-    if not (FileExists(sArqListaUnit)) then
-    begin
-      ShowMessage('Arquivo inexistente: ' + sArqListaUnit);
-      Exit;
-    end;
-  end
-  else
-  begin
-    sArqListaUnit := sWorkspace + '\bin\CodeCoverage\CodeCov_units_manual.lst';
-    mmUnits.Lines.SaveToFile(sArqListaUnit);
-  end;
-
-  sComando := sWorkspace + '\bin\CodeCoverage\CodeCoverage.exe';
-  sParametro := '-v -e "' + sWorkspace +
-    '\bin\pg5AppTests.exe" -m "' + sWorkspace +
-    '\bin\pg5AppTests.map" -uf "' +
-    sArqListaUnit + '" -spf "' + sWorkspace +
-    '\bin\CodeCoverage\CodeCov_Paths.lst" -od "' + sWorkspace +
-    '\bin\CodeCoverage\Result_CodeCov\" -lt -html -xml -emma -lapi';
-
-  ShellExecute(0, nil, PChar(sComando), PChar(sParametro), nil, SW_SHOWNORMAL);
+  ExecutarCodeCoverage;
 end;
 
 procedure TfrmCodeCoverage.Button1Click(Sender: TObject);
@@ -140,6 +93,140 @@ end;
 procedure TfrmCodeCoverage.ckUsarUnitsOriginaisClick(Sender: TObject);
 begin
   mmUnits.Enabled := not ckUsarUnitsOriginais.Checked;
+end;
+
+function TfrmCodeCoverage.DefinirWorkspace: boolean;
+begin
+  FWorkspace := Trim(edWorkspace.Text);
+
+  if FWorkspace.IsEmpty then
+  begin
+    ShowMessage('Por favor, preencha o caminho da workspace.');
+    if edWorkspace.CanFocus then
+      edWorkspace.SetFocus;
+  end;
+
+  result := not FWorkspace.IsEmpty;
+end;
+
+procedure TfrmCodeCoverage.ExecutarCodeCoverage;
+var
+  sComando: string;
+  sParametro: string;
+begin
+  if not DefinirWorkspace then
+    Exit;
+  if not ValidarListaUnits then
+    Exit;
+  if not ValidarExeAppTests then
+    Exit;
+  if not ValidarMapAppTests then
+    Exit;
+  if not ValidarCodeCovPaths then
+    Exit;
+  if not ValidarCodeCovUnits then
+    Exit;
+
+  sComando := FWorkspace + '\bin\CodeCoverage\CodeCoverage.exe';
+  sParametro := '-v -e "' + FCaminhoExeAppTests +
+    '" -m "' + FCaminhoMapAppTests +
+    '" -uf "' + FCaminhoCodeCovUnits +
+    '" -spf "' + FCaminhoCodeCovPaths +
+    '" -od "' + FWorkspace +
+    '\bin\CodeCoverage\Result_CodeCov\" -lt -html -xml -emma -lapi';
+
+  ShellExecute(0, nil, PChar(sComando), PChar(sParametro), nil, SW_SHOWNORMAL);
+end;
+
+procedure TfrmCodeCoverage.FormCreate(Sender: TObject);
+begin
+  FArquivoIni := TArquivoIni.Create;
+end;
+
+procedure TfrmCodeCoverage.FormDestroy(Sender: TObject);
+begin
+  try
+    FArquivoIni.CaminhoWorkspace := Trim(edWorkspace.Text);
+  finally
+    FreeAndNil(FArquivoIni);
+  end;
+end;
+
+procedure TfrmCodeCoverage.FormShow(Sender: TObject);
+begin
+  PreencherCaminhoWorkspace;
+end;
+
+procedure TfrmCodeCoverage.PreencherCaminhoWorkspace;
+begin
+  edWorkspace.Text := FArquivoIni.CaminhoWorkspace;
+end;
+
+function TfrmCodeCoverage.ValidarCodeCovPaths: boolean;
+begin
+  FCaminhoCodeCovPaths := FWorkspace + '\bin\CodeCoverage\CodeCov_Paths.lst';
+
+  if FileExists(FCaminhoCodeCovPaths) then
+    Exit(True);
+
+  ShowMessage('Arquivo inexistente: ' + FCaminhoCodeCovPaths);
+  result := False;
+end;
+
+function TfrmCodeCoverage.ValidarCodeCovUnits: boolean;
+begin
+  if ckUsarUnitsOriginais.Checked then
+  begin
+    FCaminhoCodeCovUnits := FWorkspace + '\bin\CodeCoverage\CodeCov_units.lst';
+
+    result := FileExists(FCaminhoCodeCovUnits);
+    if result then
+      Exit;
+
+    ShowMessage('Arquivo inexistente: ' + FCaminhoCodeCovUnits);
+  end
+  else
+  begin
+    FCaminhoCodeCovUnits := FWorkspace + '\bin\CodeCoverage\CodeCov_units_manual.lst';
+    mmUnits.Lines.SaveToFile(FCaminhoCodeCovUnits);
+    result := True;
+  end;
+end;
+
+function TfrmCodeCoverage.ValidarExeAppTests: boolean;
+begin
+  FCaminhoExeAppTests := FWorkspace + '\bin\' + FArquivoIni.NomeExeTests;
+
+  if FileExists(FCaminhoExeAppTests) then
+    Exit(True);
+
+  ShowMessage('Arquivo inexistente: ' + FCaminhoExeAppTests);
+  result := False;
+end;
+
+function TfrmCodeCoverage.ValidarListaUnits: boolean;
+begin
+  if ckUsarUnitsOriginais.Checked then
+    Exit(True);
+
+  result := Trim(mmUnits.Text) <> EmptyStr;
+  if result then
+    Exit;
+
+  ShowMessage('Por favor, preencha a lista de units.');
+  if mmUnits.CanFocus then
+    mmUnits.SetFocus;
+end;
+
+function TfrmCodeCoverage.ValidarMapAppTests: boolean;
+begin
+  FCaminhoMapAppTests := FWorkspace + '\bin\' + FArquivoIni.NomeMapTests;
+
+  if FileExists(FCaminhoMapAppTests) then
+    Exit(True);
+
+  ShowMessage('Arquivo inexistente: ' + FCaminhoMapAppTests);
+  result := False;
 end;
 
 end.

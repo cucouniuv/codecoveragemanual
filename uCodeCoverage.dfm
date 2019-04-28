@@ -1,7 +1,7 @@
 object frmCodeCoverage: TfrmCodeCoverage
   Left = 0
   Top = 0
-  Caption = 'Code Coverage (Manual)'
+  Caption = 'Code Coverage'
   ClientHeight = 300
   ClientWidth = 635
   Color = clBtnFace
@@ -12,6 +12,9 @@ object frmCodeCoverage: TfrmCodeCoverage
   Font.Style = []
   OldCreateOrder = False
   Position = poMainFormCenter
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnShow = FormShow
   DesignSize = (
     635
     300)

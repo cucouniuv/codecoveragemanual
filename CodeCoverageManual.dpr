@@ -4,7 +4,8 @@ uses
   Vcl.Forms,
   uCodeCoverage in 'uCodeCoverage.pas' {frmCodeCoverage},
   Vcl.Themes,
-  Vcl.Styles;
+  Vcl.Styles,
+  uArquivoIni in 'uArquivoIni.pas';
 
 {$R *.res}
 
